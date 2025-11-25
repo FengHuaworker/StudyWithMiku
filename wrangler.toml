@@ -1,0 +1,8 @@
+name = "study-with-miku"
+compatibility_date = "2023-10-01"
+
+[env.production]
+
+[[routes]]
+pattern = "/*"
+custom_domain = false

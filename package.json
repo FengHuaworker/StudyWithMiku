@@ -1,0 +1,19 @@
+{
+  "name": "study-with-miku",
+  "version": "0.0.1",
+  "description": "Study with Miku - 和Miku一起学习吧~",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.3.4",
+    "@vueuse/core": "^10.1.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "vite": "^4.4.5"
+  }
+}

@@ -18,6 +18,9 @@
       {{ isFullscreen ? '退出全屏' : '全屏' }}
     </button>
     
+    <!-- 番茄钟！＞﹏＜ -->
+    <PomodoroTimer />
+    
     <!-- APlayer 播放器 -->
     <div id="aplayer" class="aplayer-container"></div>
   </div>
@@ -28,6 +31,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useFullscreen } from '@vueuse/core'
 import { getAllSongs } from './data/songs.js'
 import { loadScript, loadStyle, preloadVideos } from './utils/cache.js'
+import PomodoroTimer from './components/PomodoroTimer.vue'
 
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 const showControls = ref(true)

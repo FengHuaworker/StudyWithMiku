@@ -1,0 +1,481 @@
+<template>
+  <div class="pomodoro-timer" :class="{ hidden: !showControls }">
+    <div class="timer-container">
+      <div class="status-indicator">
+        <span class="status-text" :class="statusClass">{{ statusText }}</span>
+      </div>
+      
+      <div class="timer-display">
+        <div class="time-circle">
+          <svg class="progress-ring" width="120" height="120">
+            <circle
+              class="progress-ring-background"
+              cx="60"
+              cy="60"
+              r="54"
+              stroke="rgba(255, 255, 255, 0.2)"
+              stroke-width="5"
+              fill="transparent"
+            />
+            <circle
+              class="progress-ring-fill"
+              :class="statusClass"
+              cx="60"
+              cy="60"
+              r="54"
+              stroke="currentColor"
+              stroke-width="5"
+              fill="transparent"
+              :stroke-dasharray="circumference"
+              :stroke-dashoffset="strokeDashoffset"
+              transform="rotate(-90 60 60)"
+            />
+          </svg>
+          <div class="time-text">
+            <span class="minutes">{{ formattedMinutes }}</span>
+            <span class="separator">:</span>
+            <span class="seconds">{{ formattedSeconds }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="timer-controls">
+        <button 
+          v-if="!isRunning" 
+          class="control-btn start-btn" 
+          @click="startTimer"
+          :disabled="timeLeft <= 0"
+        >
+          <span class="btn-icon">▶</span>
+        </button>
+        <button 
+          v-else 
+          class="control-btn pause-btn" 
+          @click="pauseTimer"
+        >
+          <span class="btn-icon">⏸</span>
+        </button>
+        <button 
+          class="control-btn reset-btn" 
+          @click="resetTimer"
+        >
+          <span class="btn-icon">↺</span>
+        </button>
+      </div>
+      
+      <div class="timer-settings">
+        <div class="setting-group">
+          <label>专注时间(分钟)</label>
+          <input 
+            type="number" 
+            v-model.number="focusDuration" 
+            min="1" 
+            max="60"
+            :disabled="isRunning"
+          />
+        </div>
+        <div class="setting-group">
+          <label>休息时间(分钟)</label>
+          <input 
+            type="number" 
+            v-model.number="breakDuration" 
+            min="1" 
+            max="30"
+            :disabled="isRunning"
+          />
+        </div>
+      </div>
+      
+      <div class="pomodoro-count">
+        <span class="count-label">已完成番茄:</span>
+        <div class="count-display">
+          <span 
+            v-for="i in 4" 
+            :key="i" 
+            class="pomodoro-dot"
+            :class="{ filled: completedPomodoros >= i }"
+          ></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+const STATUS = {
+  FOCUS: 'focus',
+  BREAK: 'break',
+  LONG_BREAK: 'longBreak'
+}
+
+const timeLeft = ref(25 * 60)
+const isRunning = ref(false)
+const currentStatus = ref(STATUS.FOCUS)
+const focusDuration = ref(25)
+const breakDuration = ref(5)
+const completedPomodoros = ref(0)
+const showControls = ref(true)
+const lastActivityTime = ref(Date.now())
+
+import { watch } from 'vue'
+
+watch(focusDuration, (newVal) => {
+  if (currentStatus.value === STATUS.FOCUS && !isRunning.value) {
+    timeLeft.value = newVal * 60
+  }
+})
+
+watch(breakDuration, (newVal) => {
+  if (currentStatus.value !== STATUS.FOCUS && !isRunning.value) {
+    timeLeft.value = newVal * 60
+  }
+})
+
+let timer = null
+
+const formattedMinutes = computed(() => {
+  return Math.floor(timeLeft.value / 60).toString().padStart(2, '0')
+})
+
+const formattedSeconds = computed(() => {
+  return (timeLeft.value % 60).toString().padStart(2, '0')
+})
+
+const statusText = computed(() => {
+  switch (currentStatus.value) {
+    case STATUS.FOCUS: return '专注时间'
+    case STATUS.BREAK: return '休息时间'
+    case STATUS.LONG_BREAK: return '长休息'
+    default: return '专注时间'
+  }
+})
+
+const statusClass = computed(() => {
+  switch (currentStatus.value) {
+    case STATUS.FOCUS: return 'focus'
+    case STATUS.BREAK: return 'break'
+    case STATUS.LONG_BREAK: return 'long-break'
+    default: return 'focus'
+  }
+})
+
+const circumference = computed(() => 2 * Math.PI * 54)
+const strokeDashoffset = computed(() => {
+  const totalTime = currentStatus.value === STATUS.FOCUS 
+    ? focusDuration.value * 60 
+    : breakDuration.value * 60
+  const progress = (totalTime - timeLeft.value) / totalTime
+  return circumference.value * (1 - progress)
+})
+
+const startTimer = () => {
+  if (timeLeft.value <= 0) return
+  isRunning.value = true
+  timer = setInterval(() => {
+    timeLeft.value--
+    if (timeLeft.value <= 0) {
+      clearInterval(timer)
+      handleTimerComplete()
+    }
+  }, 1000)
+}
+
+const pauseTimer = () => {
+  isRunning.value = false
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+const resetTimer = () => {
+  pauseTimer()
+  timeLeft.value = focusDuration.value * 60
+  currentStatus.value = STATUS.FOCUS
+}
+
+const handleTimerComplete = () => {
+  playNotificationSound()
+  
+  if (currentStatus.value === STATUS.FOCUS) {
+    completedPomodoros.value++
+    
+    if (completedPomodoros.value % 4 === 0) {
+      currentStatus.value = STATUS.LONG_BREAK
+      timeLeft.value = breakDuration.value * 60 * 2
+    } else {
+      currentStatus.value = STATUS.BREAK
+      timeLeft.value = breakDuration.value * 60
+    }
+  } else {
+    currentStatus.value = STATUS.FOCUS
+    timeLeft.value = focusDuration.value * 60
+  }
+  
+  showNotification()
+  
+  setTimeout(() => {
+    startTimer()
+  }, 1000)
+}
+
+const playNotificationSound = () => {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+  const oscillator = audioContext.createOscillator()
+  const gainNode = audioContext.createGain()
+  
+  oscillator.connect(gainNode)
+  gainNode.connect(audioContext.destination)
+  
+  oscillator.frequency.value = 800
+  gainNode.gain.value = 0.1
+  
+  oscillator.start()
+  gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5)
+  oscillator.stop(audioContext.currentTime + 0.5)
+}
+
+const showNotification = () => {
+  if (Notification.permission === 'granted') {
+    new Notification('番茄钟', {
+      body: `${statusText.value}已完成！`,
+      icon: '/favicon.ico'
+    })
+  }
+}
+
+onMounted(() => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
+  
+  const handleMouseMove = () => {
+    showControls.value = true
+    lastActivityTime.value = Date.now()
+  }
+  
+  const handleMouseLeave = () => {
+    showControls.value = false
+  }
+  
+  const checkInactivity = () => {
+    const now = Date.now()
+    if (showControls.value && now - lastActivityTime.value > 3000) {
+      showControls.value = false
+    }
+  }
+  
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseleave', handleMouseLeave)
+  
+  const inactivityTimer = setInterval(checkInactivity, 1000)
+  
+  onUnmounted(() => {
+    clearInterval(inactivityTimer)
+  })
+})
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer)
+  }
+})
+</script>
+
+<style scoped>
+.pomodoro-timer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
+}
+
+.pomodoro-timer.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.timer-container {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-radius: 15px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  min-width: 220px;
+  text-align: center;
+  color: white;
+}
+
+.status-indicator {
+  margin-bottom: 1rem;
+}
+
+.status-text {
+  font-size: 1rem;
+  font-weight: 500;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.status-text.focus {
+  color: #ff6b6b;
+}
+
+.status-text.break {
+  color: #4ecdc4;
+}
+
+.status-text.long-break {
+  color: #45b7d1;
+}
+
+.timer-display {
+  margin-bottom: 1.5rem;
+}
+
+.time-circle {
+  position: relative;
+  display: inline-block;
+}
+
+.progress-ring {
+  display: block;
+  width: 120px;
+  height: 120px;
+}
+
+.progress-ring-fill.focus {
+  color: #ff6b6b;
+}
+
+.progress-ring-fill.break {
+  color: #4ecdc4;
+}
+
+.progress-ring-fill.long-break {
+  color: #45b7d1;
+}
+
+.time-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  font-weight: 300;
+  font-family: 'Courier New', monospace;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.control-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.control-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.start-btn {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.pause-btn {
+  background: rgba(255, 193, 7, 0.3);
+  border-color: rgba(255, 193, 7, 0.5);
+}
+
+.reset-btn {
+  background: rgba(244, 67, 54, 0.3);
+  border-color: rgba(244, 67, 54, 0.5);
+}
+
+.btn-icon {
+  font-size: 1rem;
+}
+
+.timer-settings {
+  margin-bottom: 1rem;
+}
+
+.setting-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+  font-size: 0.8rem;
+}
+
+.setting-group label {
+  opacity: 0.8;
+}
+
+.setting-group input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  color: white;
+  width: 50px;
+  text-align: center;
+}
+
+.setting-group input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.setting-group input:disabled {
+  opacity: 0.5;
+}
+
+.pomodoro-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.count-display {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.pomodoro-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: background 0.3s ease;
+}
+
+.pomodoro-dot.filled {
+  background: #ff6b6b;
+}
+</style>

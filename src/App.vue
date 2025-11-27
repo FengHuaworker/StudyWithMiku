@@ -1,19 +1,26 @@
 <template>
   <div class="app-container" @mousemove="onMouseMove" @mouseleave="onMouseLeave">
-    <video 
-      ref="videoRef" 
-      class="video-background" 
-      :src="currentVideo" 
-      autoplay 
-      muted 
-      loop
-      @loadeddata="onVideoLoaded"
-    ></video>
+    <transition name="fade" mode="out-in">
+      <video 
+        :key="currentVideo"
+        ref="videoRef" 
+        class="video-background" 
+        :src="currentVideo" 
+        autoplay 
+        muted 
+        loop
+        @loadeddata="onVideoLoaded"
+      ></video>
+    </transition>
     <div class="overlay"></div>
     <div class="content" :class="{ hidden: !showControls }">
       <h1 class="title">Study with Miku</h1>
       <p class="subtitle">Love by SHSHOUSE</p>
     </div>
+    <button class="switch-video-btn" @click="switchVideo" :class="{ hidden: !showControls }">
+      切换
+    </button>
+    
     <button class="fullscreen-btn" @click="toggleFullscreen" :class="{ hidden: !showControls }">
       {{ isFullscreen ? '退出全屏' : '全屏' }}
     </button>
@@ -61,6 +68,12 @@ const videos = [
   `${R2_BASE_URL}/mp4/2.mp4`
 ]
 const currentVideo = ref(videos[0])
+const currentVideoIndex = ref(0)
+
+const switchVideo = () => {
+  currentVideoIndex.value = (currentVideoIndex.value + 1) % videos.length
+  currentVideo.value = videos[currentVideoIndex.value]
+}
 
 // APlayer 相关变量
 const aplayer = ref(null)
@@ -178,6 +191,15 @@ onUnmounted(() => {
   height: 100vh;
   overflow: hidden;
 }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
 .video-background {
   position: absolute;
@@ -224,6 +246,25 @@ onUnmounted(() => {
 .subtitle {
   font-size: 1.2rem;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.switch-video-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 1000;
+  transition: opacity 0.3s ease;
+}
+
+.switch-video-btn.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .fullscreen-btn {

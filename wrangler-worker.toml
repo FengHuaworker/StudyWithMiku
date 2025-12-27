@@ -1,4 +1,4 @@
-name = "study-with-miku-onlinecounter"
+name = "studywithmiku"
 main = "workers/online-counter.js"
 compatibility_date = "2023-10-01"
 
